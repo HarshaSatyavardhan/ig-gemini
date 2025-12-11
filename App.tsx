@@ -1,22 +1,27 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Dna, 
-  Activity, 
-  Info, 
-  ChevronRight, 
-  Settings, 
-  Share2, 
-  Zap, 
-  Search, 
+import {
+  Dna,
+  Activity,
+  Info,
+  ChevronRight,
+  Settings,
+  Share2,
+  Zap,
+  Search,
   AlertCircle,
   CheckCircle2,
   Cpu,
   X,
   Sparkles,
   Bot,
-  Microscope
+  Microscope,
+  Atom,
+  FlaskConical,
+  Beaker
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
+import { ImmunoAI } from './components/ImmunoAI';
+import { AffinityMaturation } from './components/AffinityMaturation';
 
 // Types
 interface Region {
@@ -55,20 +60,20 @@ interface AnalysisResult {
 const analyzeSequence = (seq: string, scheme = 'IMGT'): AnalysisResult => {
   const sequence = seq.toUpperCase().replace(/[^A-Z]/g, '');
   const len = sequence.length;
-  
+
   // Anchors for Heuristic Alignment (simplified IMGT)
   // 1. 1st Cys (C23) - usually around 20-25
   // 2. Trp (W41) - usually around 35-40 (Start of FR2)
   // 3. 2nd Cys (C104) - usually around 85-100 (End of FR3 / Start of CDR3)
   // 4. FGXG/WGXG (FR4 motif) - usually around 100-115
-  
+
   let regions: Region[] = [];
   let numbering: NumberingItem[] = [];
   let score = 0;
   let reasoning: string[] = [];
 
   // --- Step 1: Find Anchors ---
-  
+
   // Find FR4 start (J-region motif: W/F-G-X-G)
   const fr4Regex = /([WF]G.G)/g;
   let match;
@@ -132,32 +137,32 @@ const analyzeSequence = (seq: string, scheme = 'IMGT'): AnalysisResult => {
     if (scheme === 'IMGT') {
       // IMGT: CDR1 (27-38), CDR2 (56-65), CDR3 (105-117)
       // Boundaries are very inclusive
-      bounds.fr1_end = c23Index + 4; 
-      bounds.cdr1_end = w41Index - 2; 
-      bounds.fr2_end = w41Index + 14; 
-      bounds.cdr2_end = bounds.fr2_end + 10; 
+      bounds.fr1_end = c23Index + 4;
+      bounds.cdr1_end = w41Index - 2;
+      bounds.fr2_end = w41Index + 14;
+      bounds.cdr2_end = bounds.fr2_end + 10;
       bounds.fr3_end = c104Index + 1; // Includes the C
-      bounds.cdr3_end = fr4Index;     
+      bounds.cdr3_end = fr4Index;
     } else if (scheme === 'Kabat') {
       // Kabat: CDR1 (31-35), CDR2 (50-65), CDR3 (95-102)
       // FR1 is longer, CDR1 starts later
-      bounds.fr1_end = c23Index + 7; 
-      bounds.cdr1_end = w41Index - 4; 
+      bounds.fr1_end = c23Index + 7;
+      bounds.cdr1_end = w41Index - 4;
       // FR2 is shorter
-      bounds.fr2_end = w41Index + 9; 
+      bounds.fr2_end = w41Index + 9;
       // CDR2 is longer (starts earlier)
-      bounds.cdr2_end = w41Index + 24; 
+      bounds.cdr2_end = w41Index + 24;
       // CDR3 starts after Cys
-      bounds.fr3_end = c104Index + 3; 
+      bounds.fr3_end = c104Index + 3;
       bounds.cdr3_end = fr4Index;
     } else if (scheme === 'Chothia') {
       // Chothia: CDR1 (26-32), CDR2 (52-56), CDR3 (95-102)
       // Structural loops are shorter
-      bounds.fr1_end = c23Index + 4; 
+      bounds.fr1_end = c23Index + 4;
       bounds.cdr1_end = w41Index - 6; // Ends much earlier than Kabat
-      bounds.fr2_end = w41Index + 11; 
+      bounds.fr2_end = w41Index + 11;
       bounds.cdr2_end = w41Index + 17; // Very short CDR2 loop
-      bounds.fr3_end = c104Index + 3; 
+      bounds.fr3_end = c104Index + 3;
       bounds.cdr3_end = fr4Index;
     }
 
@@ -174,17 +179,17 @@ const analyzeSequence = (seq: string, scheme = 'IMGT'): AnalysisResult => {
   }
 
   // --- Step 3: Map Residues ---
-  
+
   const addRegion = (start: number, end: number, type: string, color: string, name: string) => {
     // Clamp
     if (start >= len) return;
     if (end > len) end = len;
     // ensure start < end
-    if (start >= end) end = start; 
+    if (start >= end) end = start;
 
     const regionSeq = sequence.substring(start, end);
     regions.push({ type, start, end, seq: regionSeq, color, name });
-    
+
     for (let i = start; i < end; i++) {
       numbering.push({
         index: i + 1,
@@ -198,22 +203,22 @@ const analyzeSequence = (seq: string, scheme = 'IMGT'): AnalysisResult => {
   let current = 0;
   addRegion(current, bounds.fr1_end, 'FR1', 'bg-slate-300', 'Framework 1');
   current = bounds.fr1_end;
-  
+
   addRegion(current, bounds.cdr1_end, 'CDR1', 'bg-red-400', 'CDR 1');
   current = bounds.cdr1_end;
-  
+
   addRegion(current, bounds.fr2_end, 'FR2', 'bg-slate-300', 'Framework 2');
   current = bounds.fr2_end;
-  
+
   addRegion(current, bounds.cdr2_end, 'CDR2', 'bg-green-400', 'CDR 2');
   current = bounds.cdr2_end;
-  
+
   addRegion(current, bounds.fr3_end, 'FR3', 'bg-slate-300', 'Framework 3');
   current = bounds.fr3_end;
-  
+
   addRegion(current, bounds.cdr3_end, 'CDR3', 'bg-blue-500', 'CDR 3');
   current = bounds.cdr3_end;
-  
+
   addRegion(current, len, 'FR4', 'bg-slate-300', 'Framework 4');
 
   return { regions, numbering, score, reasoning, sequence, scheme };
@@ -221,14 +226,14 @@ const analyzeSequence = (seq: string, scheme = 'IMGT'): AnalysisResult => {
 
 // --- GEMINI API INTEGRATION ---
 const generateGeminiContent = async (prompt: string): Promise<string> => {
-  const apiKey = process.env.API_KEY || "";
-  
+  const apiKey = (process.env as any).API_KEY || "";
+
   if (!apiKey) {
     throw new Error("API Key not found");
   }
 
   const ai = new GoogleGenAI({ apiKey });
-  
+
   // Using gemini-2.5-flash as the base robust model for text tasks
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
@@ -241,7 +246,12 @@ const generateGeminiContent = async (prompt: string): Promise<string> => {
 
 // --- Visual Components ---
 
-const Tooltip = ({ children, text }: { children: React.ReactNode; text: string }) => {
+interface TooltipProps {
+  children: React.ReactNode;
+  text: string;
+}
+
+const Tooltip: React.FC<TooltipProps> = ({ children, text }) => {
   const [show, setShow] = useState(false);
   return (
     <div className="relative inline-block" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
@@ -257,7 +267,7 @@ const Tooltip = ({ children, text }: { children: React.ReactNode; text: string }
 
 const NecklacePlot = ({ numbering, showLabels = true }: { numbering: NumberingItem[]; showLabels?: boolean }) => {
   // Generate coordinates for a U-shaped or Loop-shaped path
-  
+
   const points = useMemo(() => {
     // Very simple "Turtle graphics" style generation for the necklace
     // Refined for better packing
@@ -267,13 +277,13 @@ const NecklacePlot = ({ numbering, showLabels = true }: { numbering: NumberingIt
       const spacing = 22;
       const row = Math.floor(i / rowLen);
       const col = i % rowLen;
-      
+
       const isRev = row % 2 !== 0;
-      const px = isRev 
-        ? (rowLen - 1 - col) * spacing + 50 
+      const px = isRev
+        ? (rowLen - 1 - col) * spacing + 50
         : col * spacing + 50;
       const py = row * spacing * 1.5 + 50;
-      
+
       return { x: px, y: py, ...res };
     });
 
@@ -281,45 +291,45 @@ const NecklacePlot = ({ numbering, showLabels = true }: { numbering: NumberingIt
 
   return (
     <div className="overflow-x-auto pb-4">
-      <svg width={Math.max(800, points.length * 5)} height={Math.max(300, (points[points.length-1]?.y || 0) + 50 || 300)} className="mx-auto">
+      <svg width={Math.max(800, points.length * 5)} height={Math.max(300, (points[points.length - 1]?.y || 0) + 50 || 300)} className="mx-auto">
         {/* Connecting Line */}
-        <path 
-          d={`M ${points.map(p => `${p.x} ${p.y}`).join(' L ')}`} 
-          fill="none" 
-          stroke="#e2e8f0" 
-          strokeWidth="4" 
+        <path
+          d={`M ${points.map(p => `${p.x} ${p.y}`).join(' L ')}`}
+          fill="none"
+          stroke="#e2e8f0"
+          strokeWidth="4"
         />
-        
+
         {/* Beads */}
         {points.map((p, i) => (
           <g key={i} className="cursor-pointer group">
-            <circle 
-              cx={p.x} 
-              cy={p.y} 
-              r="9" 
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r="9"
               className={`transition-all duration-300 ${p.region.startsWith('CDR') ? 'stroke-2 stroke-white' : ''}`}
               fill={
                 p.region === 'CDR1' ? '#ef4444' :
-                p.region === 'CDR2' ? '#4ade80' :
-                p.region === 'CDR3' ? '#3b82f6' :
-                '#94a3b8'
-              } 
+                  p.region === 'CDR2' ? '#4ade80' :
+                    p.region === 'CDR3' ? '#3b82f6' :
+                      '#94a3b8'
+              }
             />
             {showLabels && (
-              <text 
-                x={p.x} 
-                y={p.y} 
-                dy=".35em" 
-                textAnchor="middle" 
-                fill="white" 
-                fontSize="8" 
+              <text
+                x={p.x}
+                y={p.y}
+                dy=".35em"
+                textAnchor="middle"
+                fill="white"
+                fontSize="8"
                 fontWeight="bold"
                 className="pointer-events-none"
               >
                 {p.aa}
               </text>
             )}
-            
+
             {/* SVG Tooltip on Hover */}
             <title>{`${p.region} - Pos ${p.index}: ${p.aa}`}</title>
           </g>
@@ -331,11 +341,11 @@ const NecklacePlot = ({ numbering, showLabels = true }: { numbering: NumberingIt
 
 const RegionBar = ({ regions }: { regions: Region[] }) => {
   const totalLen = regions.reduce((acc, r) => acc + r.seq.length, 0);
-  
+
   return (
     <div className="w-full h-12 flex rounded-lg overflow-hidden shadow-sm my-6">
       {regions.map((r, i) => (
-        <div 
+        <div
           key={i}
           className={`${r.color} h-full flex items-center justify-center relative group transition-all duration-300 hover:brightness-110`}
           style={{ width: `${(r.seq.length / totalLen) * 100}%` }}
@@ -354,7 +364,8 @@ const RegionBar = ({ regions }: { regions: Region[] }) => {
   );
 };
 
-export default function AntibodyAnalyzer() {
+// --- Antibody Analyzer Component (Original) ---
+function AntibodyAnalyzer() {
   const defaultSeq = "EVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCARDYYGSSWYFDVWGQGTLVTVSS";
   const [sequence, setSequence] = useState(defaultSeq);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
@@ -362,7 +373,7 @@ export default function AntibodyAnalyzer() {
   const [showConfig, setShowConfig] = useState(false);
   const [showLabels, setShowLabels] = useState(true);
   const [scheme, setScheme] = useState('IMGT');
-  
+
   // AI Feature States
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<string | null>(null);
@@ -374,7 +385,7 @@ export default function AntibodyAnalyzer() {
     setIsAnimating(true);
     setAiResult(null); // Clear previous AI results on sequence change
     setAiError(null);
-    
+
     // Simulate processing delay for "AI" feel
     const timer = setTimeout(() => {
       const result = analyzeSequence(sequence, scheme);
@@ -393,11 +404,11 @@ export default function AntibodyAnalyzer() {
     setAiLoading(true);
     setAiError(null);
     setActiveAiMode(mode);
-    
+
     const cdr1 = analysis.regions.find(r => r.type === 'CDR1')?.seq || "N/A";
     const cdr2 = analysis.regions.find(r => r.type === 'CDR2')?.seq || "N/A";
     const cdr3 = analysis.regions.find(r => r.type === 'CDR3')?.seq || "N/A";
-    
+
     let prompt = "";
     if (mode === 'liabilities') {
       prompt = `
@@ -442,38 +453,9 @@ export default function AntibodyAnalyzer() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-blue-200">
-      
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
-              <Dna size={24} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-600">
-                ig-gemini
-              </h1>
-              <p className="text-xs text-slate-500 font-medium tracking-wide">ANTIBODY ANALYZER</p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <button className="p-2 text-slate-400 hover:text-blue-600 transition-colors">
-              <Share2 size={20} />
-            </button>
-            <button 
-              onClick={() => setShowConfig(true)}
-              className="flex items-center space-x-2 bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors shadow-md"
-            >
-              <Settings size={16} />
-              <span>Config</span>
-            </button>
-          </div>
-        </div>
-      </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-        
+
         {/* Input Section */}
         <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-20 h-1"></div>
@@ -492,26 +474,32 @@ export default function AntibodyAnalyzer() {
                 </span>
               </div>
             </div>
-            
+
             <textarea
               value={sequence}
               onChange={handleSequenceChange}
               className="w-full h-32 p-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-mono text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-none"
               placeholder="Paste your amino acid sequence here..."
             />
-            
+
             <div className="mt-4 flex flex-wrap gap-2">
-              <button 
+              <button
                 onClick={() => setSequence("EVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCARDYYGSSWYFDVWGQGTLVTVSS")}
                 className="text-xs bg-blue-50 text-blue-600 px-3 py-1 rounded-full hover:bg-blue-100 font-medium transition-colors"
               >
                 Load Sample VH
               </button>
-              <button 
+              <button
                 onClick={() => setSequence("DIQMTQSPSSLSASVGDRVTITCRASQGISNYLAWYQQKPGKVPKLLIYAASTLQSGVPSRFSGSGSGTDFTLTISSLQPEDVATYYCQKYNSAPLTFGGGTKVEIK")}
                 className="text-xs bg-purple-50 text-purple-600 px-3 py-1 rounded-full hover:bg-purple-100 font-medium transition-colors"
               >
                 Load Sample VL
+              </button>
+              <button
+                onClick={() => setShowConfig(true)}
+                className="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full hover:bg-slate-200 font-medium transition-colors flex items-center gap-1"
+              >
+                <Settings size={12} /> Config
               </button>
             </div>
           </div>
@@ -528,7 +516,7 @@ export default function AntibodyAnalyzer() {
           <>
             {/* Top Analysis Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              
+
               {/* AI Structural Reasoning (Rule Based) */}
               <div className="md:col-span-2 space-y-6">
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
@@ -538,7 +526,7 @@ export default function AntibodyAnalyzer() {
                     </div>
                     <h2 className="text-lg font-bold text-slate-800">Structural Topology Logic</h2>
                   </div>
-                  
+
                   <div className="space-y-4">
                     <div className="flex items-start space-x-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
                       {analysis.score > 0.8 ? (
@@ -551,8 +539,8 @@ export default function AntibodyAnalyzer() {
                           {analysis.score > 0.8 ? 'High Confidence Identification' : 'Low Confidence Approximation'}
                         </h4>
                         <p className="text-slate-500 text-sm mt-1">
-                          {analysis.score > 0.8 
-                            ? `The algorithm successfully anchored sequence features to ${scheme} antibody motifs.` 
+                          {analysis.score > 0.8
+                            ? `The algorithm successfully anchored sequence features to ${scheme} antibody motifs.`
                             : "Some standard anchors were missing. Regions are estimated based on average lengths."}
                         </p>
                       </div>
@@ -573,7 +561,7 @@ export default function AntibodyAnalyzer() {
                 {/* ✨ Generative AI Insights Panel ✨ */}
                 <div className="bg-gradient-to-br from-indigo-900 to-blue-900 rounded-2xl shadow-lg border border-indigo-700 p-6 text-white relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-32 bg-white opacity-5 rounded-full blur-3xl transform translate-x-10 -translate-y-10"></div>
-                  
+
                   <div className="flex items-center justify-between mb-6 relative z-10">
                     <div className="flex items-center space-x-2">
                       <div className="p-2 bg-white/10 text-white rounded-lg backdrop-blur-sm">
@@ -586,7 +574,7 @@ export default function AntibodyAnalyzer() {
 
                   {!aiResult && !aiLoading && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-10">
-                      <button 
+                      <button
                         onClick={() => runAiAnalysis('liabilities')}
                         className="flex items-start space-x-3 bg-white/10 hover:bg-white/20 p-4 rounded-xl transition-all border border-white/10 text-left group"
                       >
@@ -597,7 +585,7 @@ export default function AntibodyAnalyzer() {
                         </div>
                       </button>
 
-                      <button 
+                      <button
                         onClick={() => runAiAnalysis('humanize')}
                         className="flex items-start space-x-3 bg-white/10 hover:bg-white/20 p-4 rounded-xl transition-all border border-white/10 text-left group"
                       >
@@ -627,7 +615,7 @@ export default function AntibodyAnalyzer() {
                           {aiResult}
                         </div>
                       </div>
-                      <button 
+                      <button
                         onClick={() => setAiResult(null)}
                         className="mt-4 text-xs font-bold text-indigo-200 hover:text-white flex items-center gap-1 transition-colors"
                       >
@@ -636,12 +624,12 @@ export default function AntibodyAnalyzer() {
                       </button>
                     </div>
                   )}
-                  
+
                   {aiError && (
-                     <div className="mt-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm flex items-center gap-2">
-                       <AlertCircle size={16} />
-                       {aiError}
-                     </div>
+                    <div className="mt-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm flex items-center gap-2">
+                      <AlertCircle size={16} />
+                      {aiError}
+                    </div>
                   )}
 
                 </div>
@@ -660,10 +648,9 @@ export default function AntibodyAnalyzer() {
                     {analysis.regions.filter(r => r.type.startsWith('CDR')).map((cdr, idx) => (
                       <div key={idx} className="flex justify-between items-center group">
                         <div className="flex items-center space-x-2">
-                          <span className={`w-3 h-3 rounded-full ${
-                            cdr.type === 'CDR1' ? 'bg-red-400' : 
+                          <span className={`w-3 h-3 rounded-full ${cdr.type === 'CDR1' ? 'bg-red-400' :
                             cdr.type === 'CDR2' ? 'bg-green-400' : 'bg-blue-500'
-                          }`}></span>
+                            }`}></span>
                           <span className="font-medium text-slate-600">{cdr.type}</span>
                         </div>
                         <span className="font-mono text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-sm">
@@ -673,7 +660,7 @@ export default function AntibodyAnalyzer() {
                     ))}
                   </div>
                 </div>
-                
+
                 <div className="mt-6 pt-6 border-t border-slate-100">
                   <div className="text-center">
                     <span className="text-4xl font-black text-slate-800">{analysis.regions.find(r => r.type === 'CDR3')?.seq.length || 0}</span>
@@ -734,14 +721,6 @@ export default function AntibodyAnalyzer() {
         )}
       </main>
 
-      <footer className="bg-white border-t border-slate-200 mt-12 py-8">
-        <div className="max-w-6xl mx-auto px-4 text-center">
-          <p className="text-slate-400 text-sm">
-            Generated by ig-gemini • Visualizing Immune Repertoires
-          </p>
-        </div>
-      </footer>
-
       {/* Configuration Modal */}
       {showConfig && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -751,14 +730,14 @@ export default function AntibodyAnalyzer() {
                 <Settings size={18} />
                 Configuration
               </h3>
-              <button 
+              <button
                 onClick={() => setShowConfig(false)}
                 className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500"
               >
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="p-6 space-y-6">
               {/* Display Options */}
               <div>
@@ -770,9 +749,9 @@ export default function AntibodyAnalyzer() {
                       <span className="text-xs text-slate-400">Display amino acid letters on the 2D plot</span>
                     </div>
                     <div className="relative">
-                      <input 
-                        type="checkbox" 
-                        checked={showLabels} 
+                      <input
+                        type="checkbox"
+                        checked={showLabels}
                         onChange={(e) => setShowLabels(e.target.checked)}
                         className="sr-only peer"
                       />
@@ -787,13 +766,13 @@ export default function AntibodyAnalyzer() {
                 <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Numbering Scheme</h4>
                 <div className="grid grid-cols-3 gap-2">
                   {['IMGT', 'Kabat', 'Chothia'].map((s) => (
-                    <button 
+                    <button
                       key={s}
                       onClick={() => setScheme(s)}
                       className={`
                         py-2 px-3 text-xs font-bold rounded-lg shadow-sm border transition-all
-                        ${scheme === s 
-                          ? 'bg-blue-600 text-white border-transparent ring-2 ring-blue-600 ring-offset-2' 
+                        ${scheme === s
+                          ? 'bg-blue-600 text-white border-transparent ring-2 ring-blue-600 ring-offset-2'
                           : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
                         }
                       `}
@@ -812,8 +791,8 @@ export default function AntibodyAnalyzer() {
             </div>
 
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-              <button 
-                onClick={() => setShowConfig(false)} 
+              <button
+                onClick={() => setShowConfig(false)}
                 className="px-6 py-2 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-slate-800 transition-colors shadow-sm"
               >
                 Done
@@ -822,6 +801,91 @@ export default function AntibodyAnalyzer() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// --- Tab Types ---
+type TabType = 'analyzer' | 'immuno' | 'affinity';
+
+// --- Main App with Tabs ---
+export default function App() {
+  const [activeTab, setActiveTab] = useState<TabType>('analyzer');
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      {/* Header with Tabs */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
+              <Dna size={24} />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-600">
+                ig-gemini
+              </h1>
+              <p className="text-xs text-slate-500 font-medium tracking-wide">ANTIBODY ANALYSIS SUITE</p>
+            </div>
+          </div>
+
+          {/* Tab Navigation */}
+          <nav className="flex items-center bg-slate-100 rounded-lg p-1">
+            <button
+              onClick={() => setActiveTab('analyzer')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'analyzer'
+                ? 'bg-white text-slate-800 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+                }`}
+            >
+              <Dna size={16} />
+              <span className="hidden sm:inline">CDR Analyzer</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('immuno')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'immuno'
+                ? 'bg-white text-slate-800 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+                }`}
+            >
+              <FlaskConical size={16} />
+              <span className="hidden sm:inline">ImmunoAI</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('affinity')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'affinity'
+                ? 'bg-white text-slate-800 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+                }`}
+            >
+              <Beaker size={16} />
+              <span className="hidden sm:inline">Maturation</span>
+            </button>
+          </nav>
+
+          <div className="flex items-center space-x-4">
+            <button className="p-2 text-slate-400 hover:text-blue-600 transition-colors">
+              <Share2 size={20} />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Tab Content */}
+      <div className="animate-in fade-in duration-300">
+        {activeTab === 'analyzer' && <AntibodyAnalyzer />}
+        {activeTab === 'immuno' && <ImmunoAI />}
+        {activeTab === 'affinity' && <AffinityMaturation />}
+      </div>
+
+      {/* Footer */}
+      <footer className="bg-white border-t border-slate-200 mt-12 py-8">
+        <div className="max-w-6xl mx-auto px-4 text-center">
+          <p className="text-slate-400 text-sm">
+            Generated by ig-gemini • Visualizing Immune Repertoires
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
