@@ -1,5 +1,5 @@
 {
-  "name": "SeqLogic AI - Antibody Analyzer",
+  "name": "ig-gemini",
   "description": "A specialized tool for analyzing antibody sequences (VH/VL), identifying structural motifs, and providing AI-powered insights using Gemini.",
   "requestFramePermissions": []
 }
